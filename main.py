@@ -12,15 +12,16 @@ from model import HGT
 # 超参数
 n_inp = 256     # 输入特征维度
 n_hid = 128     # 隐藏层维度
-n_epoch = 50    # 训练轮数
+n_epoch = 80    # 训练轮数
 max_lr = 1e-3   # 最大学习率
 clip = 1.0      # 梯度裁剪
 n_layers = 1    # 层数
 n_heads = 4     # 多头注意力
 n_recommend = 3 # 推荐数量
-n_classes = 3   # 类别数量
+n_classes = 13  # 类别数量
 min_similarity = 0.4    # 最小相似度阈值
 proportion = 0.8        # 训练集比例
+data_origin = 2         # 1: 示例数据 2: 数据库数据
 
 # 全局变量
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -31,6 +32,7 @@ train_idx = None
 val_idx = None
 labels = None
 criterion = nn.BCEWithLogitsLoss()  # 多分类
+data_path = "./data/example/" if data_origin == 1 else "./data/database/"
 
 
 # 模型参数个数
@@ -46,12 +48,12 @@ def get_n_params(model):
 
 def create_hetero_graph():
     # 读取三元组文件
-    with open('kg_final.txt', 'r') as file:
+    with open(data_path + 'kg_final.txt', 'r', encoding='utf-8') as file:
         triples = [list(map(int, line.strip().split())) for line in file]
 
     # 读取关系映射文件
     relation_mapping = {}
-    with open('relation_list.txt', 'r') as file:
+    with open(data_path + 'relation_list.txt', 'r', encoding='utf-8') as file:
         for line in file:
             rel, rel_id = line.strip().split()
             edge_dict[rel] = int(rel_id)
@@ -88,7 +90,9 @@ def load_train():
     global labels
     labels = []
     pids = []
-    with open('train.txt', 'r') as file:
+    with open(data_path + 'train.txt', 'r', encoding='utf-8') as file:
+        global n_classes
+        n_classes = len(file.readline().strip().split()) - 1
         for line in file:
             res = line.strip().split()
             pid = int(res[0])
@@ -98,7 +102,8 @@ def load_train():
 
     n = len(labels)
     n_train = int(n * proportion)   # 划分训练集
-    shuffle = np.random.permutation(pids)   # 随机打乱
+    original_idx = torch.arange(n).long()
+    shuffle = np.random.permutation(original_idx)   # 随机打乱
 
     global train_idx, val_idx
     train_idx = torch.tensor(shuffle[:n_train]).long()
