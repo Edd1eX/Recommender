@@ -22,8 +22,10 @@ n_heads = 4     # 多头注意力
 n_recommend = 3 # 推荐数量
 n_classes = 13  # 类别数量
 min_similarity = 0.4    # 最小相似度阈值
+min_label_prediction = 0.5     # 最小标签预测阈值
 proportion = 0.8        # 训练集比例
 data_origin = 2         # 1: 示例数据 2: 数据库数据
+output_type = 'name'    # 输出类型：name、 id
 
 # 全局变量
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -90,14 +92,17 @@ def create_hetero_graph():
 
 
 def load_person():
-    person_mapping = {}
+    mapping = {}
     with open(data_path + 'person_list.txt', 'r', encoding='utf-8') as file:
         for line in file:
             l = line.strip().split()
             p, pid = l[0], l[1]
             name = ' '.join(l[2:])
-            person_mapping[int(pid)] = p
-    return person_mapping
+            if output_type == 'name':
+                mapping[int(pid)] = name
+            else :
+                mapping[int(pid)] = p
+    return mapping
 
 
 def load_train():
@@ -157,7 +162,7 @@ def train(model, G):
             # 将logits转换为概率值
             probs = F.sigmoid(logits)
             # 预测的类别
-            pred = (probs > 0.5).long().cpu()
+            pred = (probs > min_label_prediction).long().cpu()
             train_acc = (pred[train_idx] == labels[train_idx].long()).float().mean()
             val_acc = (pred[val_idx] == labels[val_idx].long()).float().mean()
             if best_val_acc < val_acc:
@@ -211,7 +216,7 @@ def find_similar(similarity_matrix, n, k, person_mapping):
     res_list = []
     # 存储结果
     for i, nodes in enumerate(similar_nodes):
-        res_list.append(f"Person {i}: Similar Persons {nodes}")
+        res_list.append(f"Person '{person_mapping[i]}': Similar Persons {nodes}")
     return res_list
 
 
@@ -253,8 +258,8 @@ if __name__ == '__main__':
     print(matrix)
 
     # 推荐
-    person_mapping = load_person()
-    res_list = find_similar(matrix, n_recommend, min_similarity, person_mapping)
+    mapping = load_person()
+    res_list = find_similar(matrix, n_recommend, min_similarity, mapping)
 
     # 保存结果
     save(model, res_list)

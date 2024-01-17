@@ -1,4 +1,5 @@
 data/database/
+data/database_1m/
 database.json
 __pycache__/
 .idea/
