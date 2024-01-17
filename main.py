@@ -93,7 +93,9 @@ def load_person():
     person_mapping = {}
     with open(data_path + 'person_list.txt', 'r', encoding='utf-8') as file:
         for line in file:
-            p, pid, name = line.strip().split()
+            l = line.strip().split()
+            p, pid = l[0], l[1]
+            name = ' '.join(l[2:])
             person_mapping[int(pid)] = p
     return person_mapping
 
