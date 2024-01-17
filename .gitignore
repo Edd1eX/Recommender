@@ -1,0 +1,5 @@
+data/database/
+database.json
+__pycache__/
+.idea/
+model/

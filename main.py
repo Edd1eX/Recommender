@@ -5,6 +5,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 from torch import Tensor
 import torch.nn as nn
 import torch.nn.functional as F
+import time
+import os
 
 from model import HGT
 
@@ -12,7 +14,7 @@ from model import HGT
 # 超参数
 n_inp = 256     # 输入特征维度
 n_hid = 128     # 隐藏层维度
-n_epoch = 80    # 训练轮数
+n_epoch = 100    # 训练轮数
 max_lr = 1e-3   # 最大学习率
 clip = 1.0      # 梯度裁剪
 n_layers = 1    # 层数
@@ -33,6 +35,7 @@ val_idx = None
 labels = None
 criterion = nn.BCEWithLogitsLoss()  # 多分类
 data_path = "./data/example/" if data_origin == 1 else "./data/database/"
+save_path = "./model/"
 
 
 # 模型参数个数
@@ -127,6 +130,7 @@ def load_model(g):
 
 def train(model, G):
     best_val_acc = torch.tensor(0)
+    best_model = None
     for epoch in np.arange(n_epoch) + 1:
         model.train()
         logits = model(G, out_key)
@@ -147,6 +151,7 @@ def train(model, G):
             val_acc = (pred[val_idx] == labels[val_idx].long()).float().mean()
             if best_val_acc < val_acc:
                 best_val_acc = val_acc
+                best_model = model
             print(
                 "Epoch: %d LR: %.5f Loss %.4f, Train Acc %.4f, Val Acc %.4f (Best %.4f)"
                 % (
@@ -158,6 +163,8 @@ def train(model, G):
                     best_val_acc.item(),
                 )
             )
+    print("Best Val Acc %.4f" % (best_val_acc.item()))
+    return best_model
 
 
 def compute_cosine_similarity(model, graph):
@@ -190,9 +197,25 @@ def find_similar(similarity_matrix, n, k):
 
         similar_nodes.append(selected_nodes)
 
-    # 输出结果
+    res_list = []
+    # 存储结果
     for i, nodes in enumerate(similar_nodes):
-        print(f"Person {i}: Similar Persons {nodes}")
+        res_list.append(f"Person {i}: Similar Persons {nodes}")
+    return res_list
+
+
+def save(model, res):
+    # 将模型保存到save_path/当前时间 文件夹下
+    save_dir_path = os.path.join(save_path, time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime()))
+    if not os.path.exists(save_dir_path):
+        os.makedirs(save_dir_path)
+    torch.save(model.state_dict(), os.path.join(save_dir_path, "model.pt"))
+    print(f"模型已保存到 {save_dir_path}/model.pt")
+    # 存储res到res.txt下
+    with open(os.path.join(save_dir_path, "res.txt"), 'w', encoding='utf-8') as file:
+        for line in res:
+            file.write(line + '\n')
+    print(f"结果已保存到 {save_dir_path}/res.txt")
 
 
 if __name__ == '__main__':
@@ -212,11 +235,14 @@ if __name__ == '__main__':
 
     # 训练
     print("Training MLP with #param: %d" % (get_n_params(model)))
-    train(model, graph)
+    model = train(model, graph)
 
     # 计算余弦相似度矩阵
     matrix = compute_cosine_similarity(model, graph)
     print(matrix)
 
     # 推荐
-    find_similar(matrix, n_recommend, min_similarity)
+    res_list = find_similar(matrix, n_recommend, min_similarity)
+
+    # 保存结果
+    save(model, res_list)
