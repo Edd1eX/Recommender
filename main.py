@@ -89,6 +89,15 @@ def create_hetero_graph():
     return g.to(device)
 
 
+def load_person():
+    person_mapping = {}
+    with open(data_path + 'person_list.txt', 'r', encoding='utf-8') as file:
+        for line in file:
+            p, pid, name = line.strip().split()
+            person_mapping[int(pid)] = p
+    return person_mapping
+
+
 def load_train():
     global labels
     labels = []
@@ -182,7 +191,7 @@ def compute_cosine_similarity(model, graph):
     return similarity_matrix
 
 
-def find_similar(similarity_matrix, n, k):
+def find_similar(similarity_matrix, n, k, person_mapping):
     similar_nodes = []
     for i in range(similarity_matrix.shape[0]):
         # 排除自身
@@ -193,7 +202,7 @@ def find_similar(similarity_matrix, n, k):
         top_k_indices = torch.topk(sim_scores, n).indices
 
         # 过滤保证相似度不小于 k 的节点
-        selected_nodes = [idx.item() for idx in top_k_indices if similarity_matrix[i, idx] >= k]
+        selected_nodes = [person_mapping[idx.item()] for idx in top_k_indices if similarity_matrix[i, idx] >= k]
 
         similar_nodes.append(selected_nodes)
 
@@ -242,7 +251,8 @@ if __name__ == '__main__':
     print(matrix)
 
     # 推荐
-    res_list = find_similar(matrix, n_recommend, min_similarity)
+    person_mapping = load_person()
+    res_list = find_similar(matrix, n_recommend, min_similarity, person_mapping)
 
     # 保存结果
     save(model, res_list)
